@@ -1,4 +1,5 @@
 #Anacan Mangelsdorf
+
 import tweepy
 import emoji
 # Authenticate to Twitter APIs, dont worry about how this operates
@@ -11,10 +12,35 @@ api = tweepy.API(auth, wait_on_rate_limit=True,wait_on_rate_limit_notify=True)
 
 '''###################################################'''
 
+def fillEmojiIndexDict():
+    dict = {}
+    #makes a dictionary to be updated, where each key is an index and its corresponding value is how many times an emoji was found at that index
+    #this dictionary will not remove elements where the value is 0
+    #there are 280 possible characters in a tweet, so the indeces will go from 0-279
+    count = 0
+    while(count<280):
+        dict[count] = 0
+        count+=1
+    return dict
+def trimIndexDict(dict):#takes emojiIndexDict dictionary as a parameter, and returns a new dictionary that only contains keys who's values is >0
+    trimmedDict = {}
+    count = 0
+    while(count<len(dict)):
+        if(dict[count]>0):
+            trimmedDict[count]=dict[count]
+        count+=1
+    return trimmedDict
+
+
+
+
+    
+    
 #emojiFile = open("emojis.txt", "r") #this is a file containing all of the emojis, not encoded
 tweetList = [] #this is a list that contains all tweets that are loaded through API
 #emojiList = [] #this is a list that contains all of the emojis, each as their own element, from the emojis.txt file, might not need
 timeline = api.home_timeline() #this loads my whole twitter timeline
+emojiIndexDict = fillEmojiIndexDict()
 
 
 #TODO rather than reading from the timeline, read from random? tweets (this is for later because I can control timeline)
@@ -25,6 +51,8 @@ timeline = api.home_timeline() #this loads my whole twitter timeline
 #how many times each emoji is used, again a dictionary probably, where every emoji is a key, and the values are the number of times that emoji occurs
 
 
+
+
 for count, tweet in enumerate(timeline): #this adds the text of every tweet to a list
     tweetList.append(tweet.text)
 
@@ -32,8 +60,14 @@ for count, tweet in enumerate(timeline): #this adds the text of every tweet to a
 # for count,line in enumerate(emojiFile): #this adds every emoji from the file as a specific element to the emojiList
 #     emojiList = line.split()
     
-i = j = 0
-for tweet in tweetList:
-    for index,char in enumerate(tweet):
+for tweetIndex,tweet in enumerate(tweetList): #iterates through list of tweet's text
+    for charIndex, char in enumerate(tweet): #iterates through the text of each individual tetx
         if (char in emoji.UNICODE_EMOJI): #this returns true if the character is an emoji
-            print(char, "is an emoji! It is at index", index) 
+            emojiIndexDict[charIndex]+=1  #this updates the emojiIndexDict dictionary, where each key is an index and the value is the number of times that an emoji occurs at that index
+            #print(char, "is an emoji! It is at index", charIndex) 
+
+trimmedEmojiIndexDict = trimIndexDict(emojiIndexDict)
+#trimmedEmojiIndexDict now contains all keys of emojiIndexDict who's values are >0 
+#trimmedEmojiIndexDict only contains indexes where emojis did occur, and the values are the number of occurences
+                                                    
+

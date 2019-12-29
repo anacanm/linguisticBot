@@ -14,28 +14,6 @@ conn = None #conn is short for connection, that is: connection to the database
 cursor = None
 rowCount = 0
 
-# def createConnection():
-#     #create a database connection to a SQLite database
-#     global conn
-#     filePath = os.path.join(os.getcwd(), "linguistDB.db") #TODO change database name to tweets.db
-
-
-#     try:
-#         conn = sqlite3.connect(filePath)
-#         return conn
-#         print("all good baby, you got a big brain")
-#     except Error as e:
-#         print(e)
-#         return None
-
-
-# def createTable(conn, createStatement): #conn is the connection object, and createStatement is the SQL statement 
-#     try:
-#         c = conn.cursor()
-#         c.execute(createStatement)
-#     except Error as e:
-#         print(e)
-
 
 def setup():#this connects to the database and creates a new table
     global conn
@@ -67,7 +45,6 @@ def setup():#this connects to the database and creates a new table
 
 
 
-
 def insertData(tweetText, emojisContained, numberEmojis, sentiment, dateTime):
     global conn
     global cursor
@@ -92,7 +69,6 @@ def insertData(tweetText, emojisContained, numberEmojis, sentiment, dateTime):
 
 
 
-
 if __name__ == "__main__":    
     setup()
 
@@ -105,6 +81,6 @@ if __name__ == "__main__":
     insertData("bar", "ye", 2, 2.0, now)
     insertData("bash", "ye", 2, 3.0, now)
     insertData("foo", "ye", 2, 4.0, now)
-    
+
     cursor.close()
     

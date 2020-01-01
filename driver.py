@@ -1,15 +1,95 @@
-#Anacan Mangelsdorf
+#!/usr/bin/env python3
+
+#Made by Anacan Mangelsdorf
+#https://github.com/anacanm
+#https://www.linkedin.com/in/anacan-mangelsdorf-6babb1194/
+
 import tweepy
-import emoji as EMOJI
-import datetime
-import time
-import random
+import os
+import sqlite3
+from sqlite3 import Error
 import json
+import emoji as EMOJI
+from datetime import datetime
+import random
+import csv
+import time
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 ######################################
 api = None
+
+tableTitle = ("[" + (datetime.today().strftime("%m/%d/%Y")) + " " + datetime.now().strftime("%H:%M") + "]").replace("/","_").replace(":", "_")
+
+conn = None
+cursor = None
+rowCount = 0
+
 emojiList = []
+
+tweetsToGather = 1000
+#NOTE tweetsToGather is the number of tweets that is desired to be added to the table
 ######################################
+def setupDB():#this connects to the database and creates a new table
+    global conn
+    global cursor
+
+    filePath = os.path.join(os.getcwd(), "tweets.db")
+    
+    #the below code connects to the database or prints an error
+    try:
+        conn = sqlite3.connect(filePath)
+    except Error as e:
+        print(e)
+
+    #the below code creates a new table
+
+    createStatement = """ CREATE TABLE IF NOT EXISTS {} (
+    tweetText text PRIMARY KEY,
+    emojisContained text NOT NULL,
+    numberEmojis integer NOT NULL,
+    sentiment decimal NOT NULL,
+    dateTime text NOT NULL
+    ); """.format(tableTitle)
+    
+    try:
+        cursor = conn.cursor()
+        cursor.execute(createStatement)
+    except Error as e:
+        print(e)
+        
+
+
+def insertData(tweetText, emojisContained, numberEmojis, sentiment, dateTime):
+    global conn
+    global cursor
+    global rowCount
+    
+    # insertStatement = """ INSERT INTO {} (tweetText, emojisContained, numberEmojis, sentiment, dateTime)
+    # VALUES("{}", "{}", {}, {}, "{}")""".format(tableTitle,tweetText, emojisContained, numberEmojis, sentiment, dateTime)
+    
+    #the below statement inserts data into the table, as long as there are no text duplicates
+    insertStatement = """ INSERT INTO {} (tweetText, emojisContained, numberEmojis, sentiment, dateTime)
+    SELECT *
+    FROM (VALUES("{}", "{}", {}, {}, "{}"))
+    WHERE "{}" NOT IN (SELECT tweetText FROM {})""".format(tableTitle, tweetText, emojisContained, numberEmojis, sentiment, dateTime, tweetText, tableTitle)
+
+    rowStatement = """ SELECT COUNT(*) FROM {}""".format(tableTitle)
+
+
+    try:
+        cursor.execute(insertStatement)
+        conn.commit() 
+        cursor.execute(rowStatement)
+        rowCount = (cursor.fetchall())[0][0]
+    except Error as e:
+        print(e)
+        print(insertStatement)
+    #NOTE if running into errors with inserting data, the issue may lie in when the commit/close is called
+
+######################################
+'''here is the end of the database methods'''
+'''below is the twitter and text methods'''
+
 def connectToAPI():
     global api
     #setting up credentials from the config file and connecting to API
@@ -29,16 +109,12 @@ def connectToAPI():
     api = tweepy.API(auth, wait_on_rate_limit=True,wait_on_rate_limit_notify=True)
 
 
-
 def loadEmojiList():
     global emojiList
     file = open('emojiTxt.txt', 'r')
-    write = open("timeSortedTweets.txt", "a")
     read = (file.readline())
     for emoji in read:
         emojiList.append(emoji)
-
-
 
 
 def getText(searchResult):
@@ -56,23 +132,42 @@ def getText(searchResult):
     except:
         return ""
 
-    return text
+    return (text.replace("\"", "\'"))
 
+
+
+def writeToCSV():
+    getStatement =  """SELECT *
+    FROM {}""".format(tableTitle)
+    fileName = (tableTitle.replace("[", "").replace("]", "")) + ".csv"
+
+    try:
+        cursor.execute(getStatement)
+        data = cursor.fetchall()
+
+        with open(os.path.join(os.getcwd(),fileName), "w+") as csvFile:
+            header = ["tweetText","emojisContained", "numberEmojis", "sentiment", "dateTime"] 
+            writer = csv.DictWriter(csvFile, fieldnames = header)
+            writer.writeheader()
+
+            for row in data:
+                writer.writerow({header[0]: row[0], header[1]: row[1], header[2]: row[2], header[3]: row[3], header[4]: row[4]})
+
+    except Error as e:
+        print(e)
 
 
 
 def main():
+    setupDB()
     connectToAPI()
+
     loadEmojiList()
     global api
 
-
-    #TODO remove tweetList and all occurences
-    tweetList = [] #this is a list that contains ALL TWEETS that are loaded through API
-
-
-    maxTweets = 1000
-    while (len(tweetList)< maxTweets): #TODO change condition to while rowCount<1000
+    while(rowCount<tweetsToGather):
+        #print(rowCount, "rows")
+        time.sleep(5)
         text = ""
         emojisInText = ""
         textContainsEmoji = False
@@ -116,21 +211,13 @@ def main():
         scores = sentimentAnalyzer.polarity_scores(text)
         sentiment = scores["compound"]
 
-        
-
         numberEmojis = len(emojisInText)
 
-        print(text)
-        print()
-        print(emojisInText, "are in the text, and there are", numberEmojis, "emojis") 
-        print(sentiment, "is the sentiment score")
-        print(formattedDateTime)
-        print("////////////////////////////////////")
-        print("////////////////////////////////////")
-        print()
-        
+        insertData(text,emojisInText, numberEmojis, sentiment, formattedDateTime)
 
-        time.sleep(5)
+        
+    writeToCSV()
+    cursor.close()
 
 main()
-        
+print("Done! A new csv file is now in your current directory!")

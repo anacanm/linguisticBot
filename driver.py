@@ -1,18 +1,24 @@
+#!/usr/bin/env python3
+
+#Made by Anacan Mangelsdorf
+#https://github.com/anacanm
+#https://www.linkedin.com/in/anacan-mangelsdorf-6babb1194/
+
 import tweepy
 import os
 import sqlite3
-import json
 from sqlite3 import Error
+import json
 import emoji as EMOJI
 from datetime import datetime
-from datetime import date
-import time
 import random
+import csv
+import time
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 ######################################
 api = None
 
-tableTitle = "[" + (date.today().strftime("%m/%d/%Y")) + " " + datetime.now().strftime("%H:%M") + "]"
+tableTitle = ("[" + (datetime.today().strftime("%m/%d/%Y")) + " " + datetime.now().strftime("%H:%M") + "]").replace("/","_").replace(":", "_")
 
 conn = None
 cursor = None
@@ -20,7 +26,8 @@ rowCount = 0
 
 emojiList = []
 
-tweetsToGather = 100
+tweetsToGather = 1000
+#NOTE tweetsToGather is the number of tweets that is desired to be added to the table
 ######################################
 def setupDB():#this connects to the database and creates a new table
     global conn
@@ -66,10 +73,14 @@ def insertData(tweetText, emojisContained, numberEmojis, sentiment, dateTime):
     FROM (VALUES("{}", "{}", {}, {}, "{}"))
     WHERE "{}" NOT IN (SELECT tweetText FROM {})""".format(tableTitle, tweetText, emojisContained, numberEmojis, sentiment, dateTime, tweetText, tableTitle)
 
+    rowStatement = """ SELECT COUNT(*) FROM {}""".format(tableTitle)
+
+
     try:
         cursor.execute(insertStatement)
         conn.commit() 
-        rowCount = cursor.rowcount
+        cursor.execute(rowStatement)
+        rowCount = (cursor.fetchall())[0][0]
     except Error as e:
         print(e)
         print(insertStatement)
@@ -101,7 +112,6 @@ def connectToAPI():
 def loadEmojiList():
     global emojiList
     file = open('emojiTxt.txt', 'r')
-    write = open("timeSortedTweets.txt", "a")
     read = (file.readline())
     for emoji in read:
         emojiList.append(emoji)
@@ -122,8 +132,29 @@ def getText(searchResult):
     except:
         return ""
 
-    return text
+    return (text.replace("\"", "\'"))
 
+
+
+def writeToCSV():
+    getStatement =  """SELECT *
+    FROM {}""".format(tableTitle)
+    fileName = (tableTitle.replace("[", "").replace("]", "")) + ".csv"
+
+    try:
+        cursor.execute(getStatement)
+        data = cursor.fetchall()
+
+        with open(os.path.join(os.getcwd(),fileName), "w+") as csvFile:
+            header = ["tweetText","emojisContained", "numberEmojis", "sentiment", "dateTime"] 
+            writer = csv.DictWriter(csvFile, fieldnames = header)
+            writer.writeheader()
+
+            for row in data:
+                writer.writerow({header[0]: row[0], header[1]: row[1], header[2]: row[2], header[3]: row[3], header[4]: row[4]})
+
+    except Error as e:
+        print(e)
 
 
 
@@ -135,6 +166,8 @@ def main():
     global api
 
     while(rowCount<tweetsToGather):
+        #print(rowCount, "rows")
+        time.sleep(5)
         text = ""
         emojisInText = ""
         textContainsEmoji = False
@@ -178,15 +211,13 @@ def main():
         scores = sentimentAnalyzer.polarity_scores(text)
         sentiment = scores["compound"]
 
-        
-
         numberEmojis = len(emojisInText)
-
 
         insertData(text,emojisInText, numberEmojis, sentiment, formattedDateTime)
 
-        #time.sleep(.5)
-
+        
+    writeToCSV()
     cursor.close()
 
 main()
+print("Done! A new csv file is now in your current directory!")
